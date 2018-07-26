@@ -1,7 +1,7 @@
 #cython: wraparound=False, cdivision=True, boundscheck=False
 
 cimport cython
-from libc.math cimport sqrt, exp, fabs, M_PI
+from libc.math cimport sqrt, exp, fabs, M_PI, NAN
 from scipy.special.cython_special cimport ndtri, gamma, chndtr
 
 
@@ -14,12 +14,12 @@ cdef extern from "hyp_1f1.h" nogil:
 
 
 # These def are used to call the code from the external portions
-def chi_to_gauss(m, eta, sigma, N):
-    return _chi_to_gauss(m, eta, sigma, N)
+def chi_to_gauss(m, eta, sigma, N, alpha=0.0001, use_nan=False):
+    return _chi_to_gauss(m, eta, sigma, N, alpha, use_nan)
 
 
-def fixed_point_finder(m_hat, sigma, N, clip_eta=True):
-    return _fixed_point_finder(m_hat, sigma, N, clip_eta)
+def fixed_point_finder(m_hat, sigma, N, clip_eta=True,  max_iter=100, eps=1e-6):
+    return _fixed_point_finder(m_hat, sigma, N, clip_eta, max_iter, eps)
 
 
 def root_finder(r, N, max_iter=500, eps=1e-6):
@@ -36,8 +36,7 @@ cdef double hyp1f1(double a, double b, double x) nogil:
     return gsl_sf_hyperg_1F1(a, b, x)
 
 
-cdef double _chi_to_gauss(double m, double eta, double sigma, double N,
-                          double alpha=0.0001) nogil:
+cdef double _chi_to_gauss(double m, double eta, double sigma, double N, double alpha, bint use_nan) nogil:
     """Maps the noisy signal intensity from a Rician/Non central chi distribution
     to its gaussian counterpart. See p. 4 of [1] eq. 12.
 
@@ -72,9 +71,15 @@ cdef double _chi_to_gauss(double m, double eta, double sigma, double N,
 
     # clip cdf between alpha/2 and 1-alpha/2
     if cdf < alpha/2:
-        cdf = alpha/2
+        if use_nan:
+            cdf = NAN
+        else:
+            cdf = alpha/2
     elif cdf > 1 - alpha/2:
-        cdf = 1 - alpha/2
+        if use_nan:
+            cdf = NAN
+        else:
+            cdf = 1 - alpha/2
 
     inv_cdf_gauss = eta + sigma * ndtri(cdf)
     return inv_cdf_gauss
@@ -128,8 +133,8 @@ cdef double _marcumq_cython(double a, double b, double M, double eps=1e-8) nogil
     return out
 
 
-cdef double _fixed_point_finder(double m_hat, double sigma, double N, bint clip_eta=True,
-                                int max_iter=100, double eps=1e-6) nogil:
+cdef double _fixed_point_finder(double m_hat, double sigma, double N,
+        bint clip_eta, int max_iter, double eps) nogil:
     """Fixed point formula for finding eta. Table 1 p. 11 of [1]
 
     Input
@@ -144,7 +149,7 @@ cdef double _fixed_point_finder(double m_hat, double sigma, double N, bint clip_
         Maximum number of iterations before breaking from the loop
     eps : double, default = 1e-6
         Criterion for reaching convergence between two subsequent estimates
-    clip_eta : bool, default True
+    clip_eta : bool
         If True, eta is clipped to 0 when below the noise floor (Bai 2014).
         If False, a new starting point m_hat is used and yields a negative eta value,
         which ensures symmetry of the normal distribution near 0 (Koay 2009).
@@ -189,7 +194,7 @@ cdef double _fixed_point_finder(double m_hat, double sigma, double N, bint clip_
 
         t0 = t1
 
-    if npy_isnan(t1): # Should not happen unless numerically unstable
+    if npy_isnan(t1):  # Should not happen unless numerically unstable
         t1 = 0
 
     if delta > 0 and not clip_eta:
@@ -227,12 +232,11 @@ cdef double _fixed_point_k_v2(double eta, double m, double sigma, double N) nogi
     and is only here for completion purposes, as it a replacement for eq. D2.
     Consider this as a secret bonus for looking at the code since we currently do not use it ;)"""
     cdef:
-        double num, denom, h1f1m, h1f1p
+        double num, denom
         double eta2sigma = -eta**2/(2*sigma**2)
         double beta_N = _beta(N)
-
-    h1f1m = hyp1f1(-0.5, N, eta2sigma)
-    h1f1p = hyp1f1(0.5, N+1, eta2sigma)
+        double h1f1m = hyp1f1(-0.5, N, eta2sigma)
+        double h1f1p = hyp1f1(0.5, N+1, eta2sigma)
 
     num = 2 * N * sigma * (m - beta_N * sigma * h1f1m)
     denom = beta_N * eta * h1f1p
