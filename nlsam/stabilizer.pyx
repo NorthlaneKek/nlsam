@@ -18,7 +18,7 @@ def chi_to_gauss(m, eta, sigma, N, alpha=0.0001, use_nan=False):
     return _chi_to_gauss(m, eta, sigma, N, alpha, use_nan)
 
 
-def fixed_point_finder(m_hat, sigma, N, clip_eta=True,  max_iter=100, eps=1e-6):
+def fixed_point_finder(m_hat, sigma, N, clip_eta=True, max_iter=100, eps=1e-6):
     return _fixed_point_finder(m_hat, sigma, N, clip_eta, max_iter, eps)
 
 
@@ -53,6 +53,9 @@ cdef double _chi_to_gauss(double m, double eta, double sigma, double N, double a
     alpha : double
         Confidence interval for the cumulative distribution function.
         Clips the cdf to alpha/2 <= cdf <= 1-alpha/2
+    use_nan : bool
+        If True, returns nans values when outside the confidence interval specified by alpha
+        instead of clipping the outliers values to alpha.
 
     Return
     --------
