@@ -12,31 +12,13 @@ cdef extern from "numpy/npy_math.h" nogil:
 cdef extern from "hyp_1f1.h" nogil:
     double gsl_sf_hyperg_1F1(double a, double b, double x)
 
-
-# These def are used to call the code from the external portions
-def chi_to_gauss(m, eta, sigma, N, alpha=0.0001, use_nan=False):
-    return _chi_to_gauss(m, eta, sigma, N, alpha, use_nan)
-
-
-def fixed_point_finder(m_hat, sigma, N, clip_eta=True, max_iter=100, eps=1e-6):
-    return _fixed_point_finder(m_hat, sigma, N, clip_eta, max_iter, eps)
-
-
-def root_finder(r, N, max_iter=500, eps=1e-6):
-    return _root_finder(r, N, max_iter, eps)
-
-
-def xi(eta, sigma, N):
-    return _xi(eta, sigma, N)
-
-
 cdef double hyp1f1(double a, double b, double x) nogil:
     """Wrapper for 1F1 hypergeometric series function
     http://en.wikipedia.org/wiki/Confluent_hypergeometric_function"""
     return gsl_sf_hyperg_1F1(a, b, x)
 
 
-cdef double _chi_to_gauss(double m, double eta, double sigma, double N, double alpha, bint use_nan) nogil:
+cpdef double chi_to_gauss(double m, double eta, double sigma, double N, double alpha=0.0001, bint use_nan=False) nogil:
     """Maps the noisy signal intensity from a Rician/Non central chi distribution
     to its gaussian counterpart. See p. 4 of [1] eq. 12.
 
@@ -136,8 +118,8 @@ cdef double _marcumq_cython(double a, double b, double M, double eps=1e-8) nogil
     return out
 
 
-cdef double _fixed_point_finder(double m_hat, double sigma, double N,
-        bint clip_eta, int max_iter, double eps) nogil:
+cdef double fixed_point_finder(double m_hat, double sigma, double N,
+        bint clip_eta=True, int max_iter=100, double eps=1e-6) nogil:
     """Fixed point formula for finding eta. Table 1 p. 11 of [1]
 
     Input
@@ -207,7 +189,7 @@ cdef double _fixed_point_finder(double m_hat, double sigma, double N,
 
 
 cdef double _beta(double N) nogil:
-    """Helper function for _xi, see p. 3 [1] just after eq. 8.
+    """Helper function for xi, see p. 3 [1] just after eq. 8.
     Generalized version for non integer N"""
     return sqrt(2) * gamma(N + 0.5) / gamma(N)
 
@@ -218,7 +200,7 @@ cdef double _fixed_point_k(double eta, double m, double sigma, double N) nogil:
         double fpg, num, denom, h1f1m, h1f1p
         double eta2sigma = -eta**2/(2*sigma**2)
 
-    fpg = sqrt(m**2 + (_xi(eta, sigma, N) - 2*N) * sigma**2)
+    fpg = sqrt(m**2 + (xi(eta, sigma, N) - 2*N) * sigma**2)
     h1f1m = hyp1f1(-0.5, N, eta2sigma)
     h1f1p = hyp1f1(0.5, N+1, eta2sigma)
 
@@ -246,7 +228,7 @@ cdef double _fixed_point_k_v2(double eta, double m, double sigma, double N) nogi
 
     return eta + num / denom
 
-cdef double _xi(double eta, double sigma, double N) nogil:
+cpdef double xi(double eta, double sigma, double N) nogil:
     """Standard deviation scaling factor formula, see p. 3 of [1], eq. 10.
 
     Input
@@ -291,7 +273,7 @@ cdef double k(double theta, double N, double r) nogil:
         double sigma = 1.
         double g, h1f1m, h1f1p, num, denom
 
-    g = sqrt(_xi(eta, sigma, N) * (1 + r**2) - 2*N)
+    g = sqrt(xi(eta, sigma, N) * (1 + r**2) - 2*N)
     h1f1m = hyp1f1(-0.5, N, -theta**2/2)
     h1f1p = hyp1f1(0.5, N+1, -theta**2/2)
 
@@ -301,10 +283,10 @@ cdef double k(double theta, double N, double r) nogil:
     return theta - num / denom
 
 
-cdef double _root_finder(double r, double N, int max_iter, double eps) nogil:
+cpdef double root_finder(double r, double N, int max_iter=500, double eps=1e-6) nogil:
     cdef:
         bint cond
-        double lower_bound = sqrt((2*N / _xi(0, 1, N)) - 1)
+        double lower_bound = sqrt((2*N / xi(0, 1, N)) - 1)
 
     if r < lower_bound:
         return 0

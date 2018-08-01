@@ -5,7 +5,7 @@ from __future__ import division
 cimport cython
 
 ctypedef fused my_fused_type:
-    cython.integral # short, int, long
+    cython.integral  # short, int, long
     cython.floating
     cython.bint
     char
@@ -42,7 +42,6 @@ cpdef void _im2col3D_overlap(my_fused_type[:,:,:] A, my_fused_type[:,:] R, int[:
         int x = A.shape[0], y = A.shape[1], z = A.shape[2]
         int s0 = size[0], s1 = size[1], s2 = size[2]
         int over0 = overlap[0], over1 = overlap[1], over2 = overlap[2]
-
 
     for a in range(0, x - over0, s0 - over0):
         for b in range(0, y - over1, s1 - over1):
