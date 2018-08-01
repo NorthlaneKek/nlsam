@@ -118,7 +118,7 @@ cdef double _marcumq_cython(double a, double b, double M, double eps=1e-8) nogil
     return out
 
 
-cdef double fixed_point_finder(double m_hat, double sigma, double N,
+cpdef double fixed_point_finder(double m_hat, double sigma, double N,
         bint clip_eta=True, int max_iter=100, double eps=1e-6) nogil:
     """Fixed point formula for finding eta. Table 1 p. 11 of [1]
 
@@ -150,7 +150,6 @@ cdef double fixed_point_finder(double m_hat, double sigma, double N,
     """
     cdef:
         double delta, m, t0, t1
-        bint cond
 
     # If m_hat is below the noise floor, return 0 instead of negatives
     # as per Bai 2014
@@ -172,9 +171,8 @@ cdef double fixed_point_finder(double m_hat, double sigma, double N,
     for _ in range(max_iter):
 
         t1 = _fixed_point_k(t0, m, sigma, N)
-        cond = fabs(t1 - t0) < eps
 
-        if cond:
+        if fabs(t1 - t0) < eps:
             break
 
         t0 = t1
@@ -285,7 +283,6 @@ cdef double k(double theta, double N, double r) nogil:
 
 cpdef double root_finder(double r, double N, int max_iter=500, double eps=1e-6) nogil:
     cdef:
-        bint cond
         double lower_bound = sqrt((2*N / xi(0, 1, N)) - 1)
 
     if r < lower_bound:
@@ -296,12 +293,10 @@ cpdef double root_finder(double r, double N, int max_iter=500, double eps=1e-6) 
 
     for _ in range(max_iter):
 
-        cond = fabs(t1 - t0) < eps
-
         t0 = t1
         t1 = k(t0, N, r)
 
-        if cond:
+        if fabs(t1 - t0) < eps:
             break
 
     return t1
