@@ -6,6 +6,7 @@ import logging
 
 from time import time
 from itertools import cycle, starmap
+from joblib import Parallel, delayed
 
 from nlsam.utils import im2col_nd, col2im_nd
 from nlsam.angular_tools import angular_neighbors
@@ -211,6 +212,7 @@ def local_denoise(data, block_size, overlap, variance, n_iter=10, mask=None,
     param_D['K'] = int(2 * np.prod(block_size))
     param_D['iter'] = 150
     param_D['batchsize'] = 500
+    param_D['numThreads'] = n_cores
 
     if 'D' in param_alpha:
         param_D['D'] = param_alpha['D']
@@ -250,8 +252,15 @@ def local_denoise(data, block_size, overlap, variance, n_iter=10, mask=None,
         data_denoised = starmap(processer, arglist)
     else:
         time_multi = time()
-        parallel_processer = multiprocesser(processer, n_cores=n_cores, mp_method=mp_method)
-        data_denoised = parallel_processer(arglist)
+        
+        if n_cores is None:
+            n_cores = -1
+        
+        data_denoised = Parallel(n_jobs=n_cores,
+                                 pre_dispatch='all',
+                                 verbose=5)(delayed(processer)(*arg) for arg in arglist)
+        # parallel_processer = multiprocesser(processer, n_cores=n_cores, mp_method=mp_method)
+        # data_denoised = parallel_processer(arglist)
         logger.info('Multiprocessing done in {0:.2f} mins.'.format((time() - time_multi) / 60.))
 
     # Put together the multiprocessed results
